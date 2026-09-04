@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Review Queue - Clinical Workflow Intelligence{% endblock %}
+
+{% block content %}
+<header class="top-navbar">
+  <div>
+    <h2 class="page-title">Reports & Clinical Review Queue</h2>
+    <p style="font-size: 0.78rem; color: var(--text-muted);">Manage AI-generated summaries, human review states, and verified exports</p>
+  </div>
+  <div class="header-actions">
+    <div id="navbar-ai-status" class="ai-status-pill warning" onclick="openModal('ai-settings-modal')">
+      <span class="status-dot amber"></span>
+      <span>Gemini AI: Key Required</span>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="loadAllReports()">
+      <i class="fas fa-sync-alt"></i> Refresh Queue
+    </button>
+  </div>
+</header>
+
+<div class="content-body">
+  <div class="card">
+    <div class="card-header">
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Filter Status:</span>
+        <button class="btn btn-secondary btn-sm" onclick="filterStatus('')">All</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterStatus('GENERATED')">Generated</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterStatus('UNDER_REVIEW')">Under Review</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterStatus('APPROVED')">Approved</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterStatus('EXPORTED')">Exported</button>
+      </div>
+      <div id="queue-count-badge" class="badge badge-indexed">Loading...</div>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Report ID</th>
+            <th>Patient</th>
+            <th>Query / Topic</th>
+            <th>Citations</th>
+            <th>Status</th>
+            <th>Generated</th>
+            <th>Reviewer</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="reports-queue-tbody">
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);">
+              <i class="fas fa-spinner fa-spin"></i> Loading reports queue...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFilter = '';
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadAllReports();
+});
+
+function filterStatus(status) {
+  currentFilter = status;
+  loadAllReports();
+}
+
+async function loadAllReports() {
+  try {
+    let url = '/api/reports';
+    if (currentFilter) url += `?status=${currentFilter}`;
+    
+    const res = await fetch(url);
+    const data = await res.json();
+    const tbody = document.getElementById('reports-queue-tbody');
+    const badge = document.getElementById('queue-count-badge');
+
+    badge.innerText = `${data.total || 0} Reports`;
+
+    if (!data.reports || data.reports.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">
+            No reports matching filter "${currentFilter || 'ALL'}".
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.reports.map(r => `
+      <tr>
+        <td><b style="color: #38BDF8; font-family: var(--font-mono);">REP-${String(r.id).padStart(4, '0')}</b></td>
+        <td>
+          <a href="/patients/${r.patient_id}" style="color: #FFF; font-weight: 600; text-decoration: none;">
+            ${r.patient_name} (${r.patient_code})
+          </a>
+        </td>
+        <td><span style="color: #E2E8F0; font-size: 0.85rem;">${r.question.length > 50 ? r.question.substring(0, 50) + '...' : r.question}</span></td>
+        <td><span class="badge badge-indexed">${r.sources ? r.sources.length : 0} citations</span></td>
+        <td><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+        <td>${new Date(r.created_at).toLocaleDateString()}</td>
+        <td>${r.reviewer_name || '<span style="color: var(--text-muted);">Unassigned</span>'}</td>
+        <td>
+          <div style="display: flex; gap: 6px;">
+            <a href="/patients/${r.patient_id}" class="btn btn-secondary btn-sm" title="Open in Workspace">
+              <i class="fas fa-external-link-alt"></i>
+            </a>
+            <a href="/api/reports/${r.id}/export?format=pdf" class="btn btn-primary btn-sm" target="_blank" title="Export PDF">
+              <i class="fas fa-file-pdf"></i>
+            </a>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+  } catch (err) {
+    console.error('Failed to load reports queue:', err);
+  }
+}
+</script>
+{% endblock %}

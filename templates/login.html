@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - Clinical Workflow Intelligence Platform{% endblock %}
+
+{% block content %}
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;">
+  <div style="max-width: 460px; width: 100%; background: var(--bg-card); backdrop-filter: var(--glass-blur); border: 1px solid var(--border-accent); border-radius: var(--radius-xl); padding: 40px; box-shadow: var(--shadow-lg), var(--shadow-glow);">
+    
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div class="brand-logo" style="width: 58px; height: 58px; margin: 0 auto 18px auto; font-size: 1.8rem;">
+        <i class="fas fa-notes-medical"></i>
+      </div>
+      <h2 style="font-family: var(--font-heading); font-size: 1.55rem; font-weight: 800; color: #FFF; letter-spacing: -0.5px;">Clinical Workflow Intelligence</h2>
+      <p style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 6px;">Secure clinical decision-support and grounded document intelligence</p>
+    </div>
+
+    <form id="login-form" onsubmit="handleLoginSubmit(event)">
+      <div style="margin-bottom: 18px;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 6px;">Clinical Email</label>
+        <div style="position: relative;">
+          <input type="email" id="login-email" name="email" class="form-control" placeholder="doctor@brainsight.ai" required style="padding-left: 40px;">
+          <i class="fas fa-envelope" style="position: absolute; left: 14px; top: 15px; color: var(--text-muted); font-size: 0.9rem;"></i>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 26px;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 6px;">Password</label>
+        <div style="position: relative;">
+          <input type="password" id="login-password" name="password" class="form-control" placeholder="••••••••" required style="padding-left: 40px;">
+          <i class="fas fa-lock" style="position: absolute; left: 14px; top: 15px; color: var(--text-muted); font-size: 0.9rem;"></i>
+        </div>
+      </div>
+
+      <button type="submit" id="login-btn" class="btn btn-primary" style="width: 100%; padding: 13px; font-size: 0.96rem;">
+        <i class="fas fa-sign-in-alt"></i> Sign In to Clinical Workspace
+      </button>
+    </form>
+
+    <!-- Quick Demo Access Credentials -->
+    <div style="margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--border-subtle);">
+      <p style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 800; margin-bottom: 12px; text-align: center;">
+        Quick Demo Profiles (Click to Auto-fill)
+      </p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="setCredentials('doctor@brainsight.ai', 'doctor123')">
+          <i class="fas fa-user-md" style="color: var(--accent-cyan);"></i> Dr. Jenkins (MD)
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="setCredentials('staff@brainsight.ai', 'staff123')">
+          <i class="fas fa-user-nurse" style="color: var(--accent-emerald);"></i> Clinical Staff
+        </button>
+      </div>
+    </div>
+
+    <!-- Safety Badge -->
+    <div style="margin-top: 24px; padding: 10px 14px; background: rgba(239, 68, 68, 0.08); border-radius: 10px; border: 1px solid rgba(239, 68, 68, 0.25); font-size: 0.74rem; color: #FCA5A5; text-align: center;">
+      <i class="fas fa-shield-alt"></i> Decision-support prototype with synthetic / de-identified records.
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setCredentials(email, password) {
+  document.getElementById('login-email').value = email;
+  document.getElementById('login-password').value = password;
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast('Authenticated successfully! Entering workspace...', 'success');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 400);
+    } else {
+      showToast(data.error || 'Invalid credentials', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In to Clinical Workspace';
+    }
+  } catch (err) {
+    showToast('Failed to authenticate with server', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In to Clinical Workspace';
+  }
+}
+</script>
+{% endblock %}

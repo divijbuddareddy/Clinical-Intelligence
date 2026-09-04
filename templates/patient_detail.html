@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}{{ patient.display_name }} ({{ patient.patient_code }}) - Clinical Intelligence Workspace{% endblock %}
+
+{% block content %}
+<div id="patient-id-holder" data-patient-id="{{ patient.id }}" style="display: none;"></div>
+
+<!-- Patient Header Dossier -->
+<header class="top-navbar" style="height: 80px;">
+  <div style="display: flex; align-items: center; gap: 16px;">
+    <a href="/patients" class="btn btn-secondary btn-sm" title="Back to Patients Directory">
+      <i class="fas fa-arrow-left"></i> Directory
+    </a>
+    
+    <div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <h2 style="font-size: 1.35rem; font-weight: 800; color: #FFF; letter-spacing: -0.3px;">{{ patient.display_name }}</h2>
+        <span class="badge badge-indexed" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 800;">{{ patient.patient_code }}</span>
+        
+        <!-- Quick Patient Switcher -->
+        <select id="quick-patient-select" class="form-control" style="width: auto; padding: 4px 10px; font-size: 0.78rem; height: 30px;" onchange="window.location.href='/patients/' + this.value">
+          <option value="" disabled selected>Switch Patient...</option>
+          <option value="1">PT-8942: Eleanor Vance (Epilepsy)</option>
+          <option value="2">PT-3108: Robert Langdon (MCA Stroke)</option>
+          <option value="3">PT-7721: Sophia Chen (Multiple Sclerosis)</option>
+          <option value="4">PT-5519: Marcus Thorne (TBI Craniotomy)</option>
+          <option value="5">PT-9204: Clara Oswald (Parkinson's DBS)</option>
+        </select>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; gap: 18px; margin-top: 3px;">
+        <span><b>DOB:</b> {{ patient.date_of_birth }}</span>
+        <span><b>Gender:</b> {{ patient.gender }}</span>
+        <span><b>Condition:</b> <span style="color: var(--accent-cyan); font-weight: 700;">{{ patient.primary_condition or 'Not specified' }}</span></span>
+        <span><b>Attending:</b> {{ patient.attending_physician or 'Dr. Sarah Jenkins, MD' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <div id="navbar-ai-status" class="ai-status-pill warning" onclick="openModal('ai-settings-modal')">
+      <span class="status-dot amber"></span>
+      <span>Gemini AI: Key Required</span>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openModal('upload-modal')">
+      <i class="fas fa-file-upload"></i> Upload Report
+    </button>
+  </div>
+</header>
+
+<div class="content-body" style="padding: 24px;">
+  <div class="clinical-workspace-grid">
+
+    <!-- LEFT PANE: Documents & History -->
+    <div class="pane">
+      <div class="pane-header">
+        <div style="font-weight: 800; color: #FFF; font-size: 0.95rem; display: flex; align-items: center; gap: 10px;">
+          <i class="fas fa-folder-tree" style="color: var(--accent-cyan);"></i> Clinical Documents & FAISS Index
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="openModal('upload-modal')">
+          <i class="fas fa-plus"></i> Upload File
+        </button>
+      </div>
+
+      <div class="pane-body">
+        <!-- Document List -->
+        <div id="documents-list-container">
+          <p style="color: var(--text-muted); text-align: center; padding: 20px;">
+            <i class="fas fa-spinner fa-spin"></i> Loading clinical records...
+          </p>
+        </div>
+
+        <!-- History of Q&A Reports -->
+        <div style="margin-top: 28px;">
+          <h4 style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-history" style="color: var(--accent-purple);"></i> Verified Clinical Reports & Q&A
+          </h4>
+          <div id="reports-history-container">
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Loading query history...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANE: AI Grounded Q&A Console -->
+    <div class="pane">
+      <div class="pane-header">
+        <div style="font-weight: 800; color: #FFF; font-size: 0.95rem; display: flex; align-items: center; gap: 10px;">
+          <i class="fas fa-brain" style="color: #C084FC;"></i> Grounded AI Clinical Query Assistant
+        </div>
+        <span class="badge badge-indexed" style="font-size: 0.72rem; letter-spacing: 0.5px;">FAISS RAG Online</span>
+      </div>
+
+      <div class="pane-body" style="display: flex; flex-direction: column; height: 100%;">
+        
+        <!-- Suggested Questions Bar -->
+        <div style="margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; border-radius: var(--radius-full);" onclick="fillQuestion('Summarize the important findings from the previous report.')">
+            <i class="fas fa-wand-magic-sparkles" style="color: var(--accent-cyan);"></i> "Summarize findings from previous report"
+          </button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; border-radius: var(--radius-full);" onclick="fillQuestion('What medications, allergies, and diagnoses are documented?')">
+            <i class="fas fa-pills" style="color: #34D399;"></i> Medications & Allergies
+          </button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; border-radius: var(--radius-full);" onclick="fillQuestion('What were the primary diagnostic findings and clinical recommendations?')">
+            <i class="fas fa-clipboard-check" style="color: #FBBF24;"></i> Diagnostics & Recommendations
+          </button>
+        </div>
+
+        <!-- Q&A Conversation Thread -->
+        <div id="qa-thread-container" class="qa-thread">
+          <div class="qa-bubble ai">
+            <div style="font-weight: 800; color: var(--accent-cyan); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-shield-halved"></i> Grounded Review Mode Active
+            </div>
+            Ask any clinical question regarding <b>{{ patient.display_name }}'s</b> uploaded records. The RAG pipeline retrieves relevant sections from FAISS and synthesizes grounded answers strictly supported by the verified documents.
+          </div>
+        </div>
+
+        <!-- Question Input Form -->
+        <form onsubmit="submitAIQuestion(event)" style="margin-top: 16px; display: flex; gap: 10px;">
+          <input type="text" id="qa-question-input" class="form-control" placeholder="Ask a grounded clinical question about {{ patient.display_name }}'s records..." required autocomplete="off">
+          <button type="submit" id="qa-submit-btn" class="btn btn-primary" style="padding: 0 24px;">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </form>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Upload Document Modal -->
+<div id="upload-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="color: #FFF;"><i class="fas fa-cloud-upload-alt" style="color: var(--accent-cyan);"></i> Upload Clinical Document</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('upload-modal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 26px;">
+      <div style="margin-bottom: 18px;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 6px;">Document Classification</label>
+        <select id="document-type-select" class="form-control">
+          <option value="CLINICAL_NOTE">Clinical Progress Note</option>
+          <option value="DISCHARGE_SUMMARY">Discharge Summary</option>
+          <option value="LAB_REPORT">Laboratory & Diagnostic Panel</option>
+          <option value="CONSULTATION_NOTE">Specialist Consultation Dossier</option>
+          <option value="GENERAL">General Clinical Record</option>
+        </select>
+      </div>
+
+      <div id="document-dropzone" class="dropzone">
+        <i class="fas fa-file-medical" style="font-size: 2.8rem; color: var(--accent-cyan); margin-bottom: 12px;"></i>
+        <h4 style="font-size: 1.05rem; font-weight: 700; color: #FFF; margin-bottom: 6px;">Drag & Drop Clinical PDF / DOCX / TXT</h4>
+        <p style="font-size: 0.82rem; color: var(--text-muted);">Automatically extracted, section-chunked, and indexed into FAISS vector database.</p>
+        <input type="file" id="file-input" style="display: none;" accept=".pdf,.docx,.txt,.md">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('upload-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Chunks Modal -->
+<div id="view-chunks-modal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 780px;">
+    <div class="modal-header">
+      <h3 style="color: #FFF;"><i class="fas fa-layer-group" style="color: var(--accent-cyan);"></i> Searchable Vector Chunks</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('view-chunks-modal')">&times;</button>
+    </div>
+    <div class="modal-body" id="chunks-modal-body" style="padding: 24px;">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('view-chunks-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Citation Detail Modal -->
+<div id="citation-modal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 720px;">
+    <div class="modal-header">
+      <h3 style="color: #FFF;"><i class="fas fa-book-open" style="color: var(--accent-cyan);"></i> Verified Source Document Citation</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('citation-modal')">&times;</button>
+    </div>
+    <div class="modal-body" id="citation-detail-content" style="padding: 24px;">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('citation-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review & Approval Modal -->
+<div id="review-approval-modal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 780px;">
+    <div class="modal-header">
+      <h3 style="color: #FFF;"><i class="fas fa-user-check" style="color: var(--accent-emerald);"></i> Clinician Review & Verification Sign-Off</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('review-approval-modal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 26px; display: flex; flex-direction: column; gap: 16px;">
+      <input type="hidden" id="review-report-id">
+      
+      <div>
+        <label style="font-size: 0.78rem; text-transform: uppercase; color: var(--text-muted); font-weight: 800;">Clinical Query:</label>
+        <p id="review-question-display" style="font-weight: 700; color: var(--accent-cyan); margin-top: 3px; font-size: 0.95rem;"></p>
+      </div>
+
+      <div>
+        <label style="font-size: 0.78rem; text-transform: uppercase; color: var(--text-muted); font-weight: 800;">Grounded Summary (Editable by Clinician):</label>
+        <textarea id="review-answer-input" class="form-control" rows="8" style="margin-top: 6px; font-size: 0.92rem; line-height: 1.55;"></textarea>
+      </div>
+
+      <div>
+        <label style="font-size: 0.78rem; text-transform: uppercase; color: var(--text-muted); font-weight: 800;">Attending Clinician Observations & Sign-off Notes:</label>
+        <textarea id="review-notes-input" class="form-control" rows="3" placeholder="Add any physician comments, corroborating notes, or verification details..." style="margin-top: 6px;"></textarea>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 12px 16px; border-radius: 10px; font-size: 0.8rem; color: #A7F3D0;">
+        <i class="fas fa-check-circle"></i> Approving this report transitions status to <b>APPROVED</b>, records your digital audit signature, and unlocks official PDF export.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('review-approval-modal')">Cancel</button>
+      <button class="btn btn-success" onclick="handleApproveReport()">
+        <i class="fas fa-stamp"></i> Clinically Approve & Sign Off
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/patient_detail.js') }}"></script>
+<script>
+function fillQuestion(q) {
+  const input = document.getElementById('qa-question-input');
+  if (input) {
+    input.value = q;
+    input.focus();
+  }
+}
+</script>
+{% endblock %}

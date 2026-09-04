@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Patients Directory - Clinical Workflow Intelligence{% endblock %}
+
+{% block content %}
+<header class="top-navbar">
+  <div>
+    <h2 class="page-title">Patients Directory</h2>
+    <p style="font-size: 0.78rem; color: var(--text-muted);">Manage patient records and attached clinical documents</p>
+  </div>
+  <div class="header-actions">
+    <div id="navbar-ai-status" class="ai-status-pill warning" onclick="openModal('ai-settings-modal')">
+      <span class="status-dot amber"></span>
+      <span>Gemini AI: Key Required</span>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openModal('create-patient-modal')">
+      <i class="fas fa-user-plus"></i> New Patient
+    </button>
+  </div>
+</header>
+
+<div class="content-body">
+  <div class="card">
+    <div class="card-header">
+      <div style="display: flex; gap: 12px; align-items: center; flex: 1; max-width: 480px;">
+        <div style="position: relative; width: 100%;">
+          <input type="text" id="patient-search-input" class="form-control" placeholder="Search by patient code, name, or condition..." oninput="handleSearch(this.value)" style="padding-left: 36px;">
+          <i class="fas fa-search" style="position: absolute; left: 12px; top: 12px; color: var(--text-muted);"></i>
+        </div>
+      </div>
+      <div id="patient-total-badge" class="badge badge-indexed">Loading...</div>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Patient Code</th>
+            <th>Patient Name</th>
+            <th>Date of Birth</th>
+            <th>Gender</th>
+            <th>Primary Condition</th>
+            <th>Attending Physician</th>
+            <th>Docs Indexed</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="patients-table-body">
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);">
+              <i class="fas fa-spinner fa-spin"></i> Loading directory...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let debounceTimer;
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadPatients();
+});
+
+function handleSearch(query) {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    loadPatients(query);
+  }, 250);
+}
+
+async function loadPatients(search = '') {
+  try {
+    const res = await fetch(`/api/patients?search=${encodeURIComponent(search)}`);
+    const data = await res.json();
+    const tbody = document.getElementById('patients-table-body');
+    const badge = document.getElementById('patient-total-badge');
+
+    badge.innerText = `${data.total || 0} Patients`;
+
+    if (!data.patients || data.patients.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">
+            No matching patient records found.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.patients.map(p => `
+      <tr>
+        <td><b style="color: #38BDF8; font-family: var(--font-mono);">${p.patient_code}</b></td>
+        <td><b style="color: #FFF;">${p.display_name}</b></td>
+        <td>${p.date_of_birth}</td>
+        <td>${p.gender || 'N/A'}</td>
+        <td><span style="font-size: 0.84rem; color: #E2E8F0;">${p.primary_condition || 'N/A'}</span></td>
+        <td>${p.attending_physician || 'Unassigned'}</td>
+        <td><span class="badge badge-${p.document_count > 0 ? 'indexed' : 'uploaded'}">${p.document_count} files</span></td>
+        <td>
+          <a href="/patients/${p.id}" class="btn btn-primary btn-sm">
+            <i class="fas fa-microscope"></i> Clinical Workspace
+          </a>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load patients:', err);
+  }
+}
+</script>
+{% endblock %}

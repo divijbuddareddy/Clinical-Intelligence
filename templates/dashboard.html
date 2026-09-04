@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Clinical Workflow Intelligence{% endblock %}
+
+{% block content %}
+<header class="top-navbar">
+  <div>
+    <h2 class="page-title">Clinical Intelligence Overview</h2>
+    <p style="font-size: 0.78rem; color: var(--text-muted);">Attending: {{ current_user.name }} • Role: {{ current_user.role }}</p>
+  </div>
+  <div class="header-actions">
+    <div id="navbar-ai-status" class="ai-status-pill warning" onclick="openModal('ai-settings-modal')">
+      <span class="status-dot amber"></span>
+      <span>Gemini AI: Key Required</span>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="loadDashboardData()">
+      <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+    <button class="btn btn-primary btn-sm" onclick="openModal('create-patient-modal')">
+      <i class="fas fa-user-plus"></i> New Patient
+    </button>
+  </div>
+</header>
+
+<div class="content-body">
+  <!-- Key Metrics Row -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-icon blue">
+        <i class="fas fa-hospital-user"></i>
+      </div>
+      <div class="metric-data">
+        <h3 id="stat-patients">5</h3>
+        <p>Active Patient Dossiers</p>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon emerald">
+        <i class="fas fa-file-medical-alt"></i>
+      </div>
+      <div class="metric-data">
+        <h3 id="stat-docs">5</h3>
+        <p>FAISS Indexed Reports</p>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon amber">
+        <i class="fas fa-clipboard-list"></i>
+      </div>
+      <div class="metric-data">
+        <h3 id="stat-pending">0</h3>
+        <p>Pending Clinical Reviews</p>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-icon purple">
+        <i class="fas fa-stamp"></i>
+      </div>
+      <div class="metric-data">
+        <h3 id="stat-approved">5</h3>
+        <p>Clinically Approved Reports</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main 2-Column Grid -->
+  <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: 28px;">
+    
+    <!-- Patients & Document Intelligence Panel -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fas fa-users-medical" style="color: var(--accent-cyan);"></i>
+          Active Clinical Patients & Sample Dossiers
+        </h3>
+        <a href="/patients" class="btn btn-secondary btn-sm">Full Directory</a>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Patient Code</th>
+              <th>Patient Name</th>
+              <th>Clinical Condition</th>
+              <th>FAISS Docs</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="dashboard-patients-tbody">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                <i class="fas fa-spinner fa-spin"></i> Loading dossiers...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent Audit Logs -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fas fa-stream" style="color: #A78BFA;"></i>
+          System Traceability & Audit Feed
+        </h3>
+      </div>
+      <div class="card-body" style="padding: 18px; max-height: 440px; overflow-y: auto;">
+        <div id="dashboard-audit-feed" style="display: flex; flex-direction: column; gap: 10px;">
+          <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">Loading audit stream...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadDashboardData();
+});
+
+async function loadDashboardData() {
+  try {
+    const [statsRes, patientsRes] = await Promise.all([
+      fetch('/api/stats'),
+      fetch('/api/patients')
+    ]);
+
+    const statsData = await statsRes.json();
+    const patientsData = await patientsRes.json();
+
+    if (statsData.metrics) {
+      document.getElementById('stat-patients').innerText = statsData.metrics.patient_count;
+      document.getElementById('stat-docs').innerText = statsData.metrics.indexed_doc_count;
+      document.getElementById('stat-pending').innerText = statsData.metrics.pending_reviews;
+      document.getElementById('stat-approved').innerText = statsData.metrics.approved_reports;
+    }
+
+    // Render Patients
+    const tbody = document.getElementById('dashboard-patients-tbody');
+    if (patientsData.patients && patientsData.patients.length > 0) {
+      tbody.innerHTML = patientsData.patients.map(p => `
+        <tr>
+          <td><b style="color: var(--accent-cyan); font-family: var(--font-mono);">${p.patient_code}</b></td>
+          <td><b style="color: #FFF;">${p.display_name}</b></td>
+          <td><span style="font-size: 0.82rem; color: #E2E8F0;">${p.primary_condition || 'N/A'}</span></td>
+          <td><span class="badge badge-indexed">${p.document_count} files</span></td>
+          <td>
+            <a href="/patients/${p.id}" class="btn btn-primary btn-sm">
+              <i class="fas fa-microscope"></i> Workspace
+            </a>
+          </td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+            No patients registered yet. Click "New Patient" to get started.
+          </td>
+        </tr>`;
+    }
+
+    // Render Audit Feed
+    const auditFeed = document.getElementById('dashboard-audit-feed');
+    if (statsData.recent_activity && statsData.recent_activity.length > 0) {
+      auditFeed.innerHTML = statsData.recent_activity.map(l => `
+        <div style="background: var(--bg-input); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-subtle); font-size: 0.82rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+            <b style="color: var(--accent-cyan);">${l.action}</b>
+            <span style="color: var(--text-muted); font-size: 0.72rem;">${new Date(l.timestamp).toLocaleTimeString()}</span>
+          </div>
+          <p style="color: var(--text-secondary);">${l.details || l.resource_type}</p>
+        </div>
+      `).join('');
+    } else {
+      auditFeed.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">No audit entries recorded.</p>';
+    }
+
+  } catch (err) {
+    console.error('Failed to load dashboard:', err);
+  }
+}
+</script>
+{% endblock %}
