@@ -22,7 +22,7 @@ The **Clinical Workflow Intelligence Platform** connects structured patient meta
   - Dense L2-normalized embeddings for patient-isolated vector similarity search.
   - Fast nearest-neighbor retrieval of the top-$k$ relevant clinical context chunks.
 - **Grounded AI Question Answering**:
-  - Google Gemini API integration (`gemini-1.5-flash` / `text-embedding-004`) with strict grounded prompting.
+  - Google AI studio API integration (`gemini-1.5-flash` / `text-embedding-004`) with strict grounded prompting.
   - Anti-hallucination constraint: strictly returns *"The uploaded documents do not contain enough information to answer this."* when ungrounded.
   - Offline / local fallback dense vectorizer + grounded extraction for reliable local demonstrations.
 - **Human-in-the-Loop Review Workflow**:
