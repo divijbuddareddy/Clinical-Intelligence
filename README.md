@@ -51,17 +51,6 @@ Flask Application (Python 3.14)
   └── ReportLab Structured PDF Export
 ```
 
-### Resume Skills Mapped
-- **Python**: Backend logic, processing, validation, AI pipeline
-- **Flask**: REST APIs and server-side routing
-- **HTML5 / CSS3 / JavaScript**: Medical-grade interactive responsive UI
-- **Google Gemini**: Grounded summaries and question answering
-- **RAG & FAISS**: Document retrieval and vector similarity search
-- **SQL & SQLAlchemy**: Patient, document, report, and audit records
-- **ReportLab**: Professional PDF generation
-- **Pytest**: Complete automated test coverage
-
----
 
 ## 4. Quick Start Guide
 
